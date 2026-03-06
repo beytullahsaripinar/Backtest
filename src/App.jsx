@@ -366,14 +366,67 @@ function DistributionTab({ data }) {
 }
 
 function EquityTab({ data }) {
-  const valid = validTrades(data.trades);
+  const valid  = validTrades(data.trades);
+  const longs  = valid.filter((t) => t.direction === "LONG");
+  const shorts = valid.filter((t) => t.direction === "SHORT");
+
   const [startBal, setStartBal] = useState(10000);
   const [inputVal, setInputVal] = useState("10000");
-  const { pts, maxDD, finalBal, gain } = calcEquity(valid, startBal);
+  const [activeEq, setActiveEq] = useState("all"); // "all" | "long" | "short"
+
+  const tradeSet = activeEq === "long" ? longs : activeEq === "short" ? shorts : valid;
+  const { pts, maxDD, finalBal, gain } = calcEquity(tradeSet, startBal);
+
+  const eqTabs = [
+    { id: "all",   label: "Tum Islemler", color: C.blue   },
+    { id: "long",  label: "Sadece LONG",  color: C.green  },
+    { id: "short", label: "Sadece SHORT", color: C.orange },
+  ];
+  const activeColor = eqTabs.find((t) => t.id === activeEq)?.color ?? C.blue;
+
+  const EqChart = ({ pts, gain, startBal, gradId, ddGradId }) => (
+    <>
+      <ResponsiveContainer width="100%" height={240}>
+        <AreaChart data={pts}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor={gain >= 0 ? activeColor : C.red} stopOpacity={0.22} />
+              <stop offset="95%" stopColor={gain >= 0 ? activeColor : C.red} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+          <XAxis dataKey="x" tick={{ fill: C.muted, fontSize: 10 }} />
+          <YAxis tick={{ fill: C.muted, fontSize: 10 }} tickFormatter={fmtBal} width={74} />
+          <ReferenceLine y={startBal} stroke="rgba(255,255,255,0.18)" strokeDasharray="4 4" />
+          <Tooltip formatter={(v) => [fmtBal(v), "Bakiye"]} />
+          <Area type="monotone" dataKey="bal" name="Bakiye" stroke={gain >= 0 ? activeColor : C.red} fill={`url(#${gradId})`} strokeWidth={2} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+      <div style={{ marginTop: 16 }}>
+        <SecTitle>Drawdown</SecTitle>
+        <ResponsiveContainer width="100%" height={120}>
+          <AreaChart data={pts}>
+            <defs>
+              <linearGradient id={ddGradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor={C.red} stopOpacity={0.28} />
+                <stop offset="95%" stopColor={C.red} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+            <XAxis dataKey="x" tick={{ fill: C.muted, fontSize: 9 }} />
+            <YAxis tick={{ fill: C.muted, fontSize: 9 }} tickFormatter={(v) => `${v.toFixed(0)}%`} width={38} />
+            <Tooltip formatter={(v) => [`${v.toFixed(2)}%`, "Drawdown"]} />
+            <Area type="monotone" dataKey="dd" name="Drawdown" stroke={C.red} fill={`url(#${ddGradId})`} strokeWidth={1.5} dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </>
+  );
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 14, marginBottom: 22, flexWrap: "wrap" }}>
+      {/* Baslangic bakiyesi input */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 9, color: C.muted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Baslangic Bakiyesi ($)</div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -386,77 +439,99 @@ function EquityTab({ data }) {
             </button>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <StatCard label="Final Bakiye"   value={fmtBal(finalBal)}                  color={pnlColor(gain)} />
-          <StatCard label="Toplam Getiri"  value={`${gain > 0 ? "+" : ""}${gain}%`}  color={pnlColor(gain)} />
-          <StatCard label="Max Drawdown"   value={`${maxDD.toFixed(1)}%`}             color={C.red} />
-          <StatCard label="Net Kar/Zarar"  value={fmtBal(finalBal - startBal)}        color={pnlColor(finalBal - startBal)} />
-        </div>
       </div>
-      <SecTitle>Bakiye Grafigi</SecTitle>
-      <ResponsiveContainer width="100%" height={260}>
-        <AreaChart data={pts}>
-          <defs>
-            <linearGradient id="balGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor={gain >= 0 ? C.green : C.red} stopOpacity={0.22} />
-              <stop offset="95%" stopColor={gain >= 0 ? C.green : C.red} stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-          <XAxis dataKey="x" tick={{ fill: C.muted, fontSize: 10 }} />
-          <YAxis tick={{ fill: C.muted, fontSize: 10 }} tickFormatter={fmtBal} width={74} />
-          <ReferenceLine y={startBal} stroke="rgba(255,255,255,0.18)" strokeDasharray="4 4" />
-          <Tooltip formatter={(v) => [fmtBal(v), "Bakiye"]} />
-          <Area type="monotone" dataKey="bal" name="Bakiye" stroke={gain >= 0 ? C.green : C.red} fill="url(#balGrad)" strokeWidth={2} dot={false} />
-        </AreaChart>
-      </ResponsiveContainer>
-      <div style={{ marginTop: 22 }}>
-        <SecTitle>Drawdown Grafigi</SecTitle>
-        <ResponsiveContainer width="100%" height={140}>
-          <AreaChart data={pts}>
-            <defs>
-              <linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor={C.red} stopOpacity={0.28} />
-                <stop offset="95%" stopColor={C.red} stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-            <XAxis dataKey="x" tick={{ fill: C.muted, fontSize: 9 }} />
-            <YAxis tick={{ fill: C.muted, fontSize: 9 }} tickFormatter={(v) => `${v.toFixed(0)}%`} width={38} />
-            <Tooltip formatter={(v) => [`${v.toFixed(2)}%`, "Drawdown"]} />
-            <Area type="monotone" dataKey="dd" name="Drawdown" stroke={C.red} fill="url(#ddGrad)" strokeWidth={1.5} dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
+
+      {/* Segment tabs */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+        {eqTabs.map((t) => (
+          <button key={t.id} onClick={() => setActiveEq(t.id)}
+            style={{ padding: "5px 16px", borderRadius: 3, cursor: "pointer", fontSize: 11, fontFamily: "monospace", transition: "all .15s",
+              background: activeEq === t.id ? `rgba(${t.id === "long" ? "0,229,160" : t.id === "short" ? "255,140,66" : "77,166,255"},0.12)` : "transparent",
+              border: `1px solid ${activeEq === t.id ? t.color : "rgba(255,255,255,0.08)"}`,
+              color: activeEq === t.id ? t.color : C.muted }}>
+            {t.label}
+          </button>
+        ))}
       </div>
+
+      {/* Stats */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        <StatCard label="Islem Sayisi"   value={tradeSet.length}                   color={C.textBright} />
+        <StatCard label="Final Bakiye"   value={fmtBal(finalBal)}                  color={pnlColor(gain)} />
+        <StatCard label="Toplam Getiri"  value={`${gain > 0 ? "+" : ""}${gain}%`}  color={pnlColor(gain)} />
+        <StatCard label="Max Drawdown"   value={`${maxDD.toFixed(1)}%`}             color={C.red} />
+        <StatCard label="Net Kar/Zarar"  value={fmtBal(finalBal - startBal)}        color={pnlColor(finalBal - startBal)} />
+      </div>
+
+      <SecTitle>
+        Bakiye Grafigi —{" "}
+        {activeEq === "all" ? "Tum Islemler" : activeEq === "long" ? "Sadece LONG" : "Sadece SHORT"}
+      </SecTitle>
+      <EqChart pts={pts} gain={gain} startBal={startBal} gradId={`eqGrad_${activeEq}`} ddGradId={`ddGrad_${activeEq}`} />
     </div>
   );
 }
 
 function StreaksTab({ data }) {
-  const valid = validTrades(data.trades);
-  const { maxTP, maxSL, history } = calcStreaks(valid);
+  const valid  = validTrades(data.trades);
+  const longs  = valid.filter((t) => t.direction === "LONG");
+  const shorts = valid.filter((t) => t.direction === "SHORT");
+  const [activeSeg, setActiveSeg] = useState("all");
+
+  const segMap = {
+    all:   { trades: valid,  label: "Tum Islemler", color: C.blue   },
+    long:  { trades: longs,  label: "Sadece LONG",  color: C.green  },
+    short: { trades: shorts, label: "Sadece SHORT", color: C.orange },
+  };
+  const seg = segMap[activeSeg];
+  const { maxTP, maxSL, history } = calcStreaks(seg.trades);
   const chartData = history.map((h, i) => ({ x: i + 1, ...h }));
+
+  const SegButton = ({ id }) => (
+    <button onClick={() => setActiveSeg(id)}
+      style={{ padding: "5px 16px", borderRadius: 3, cursor: "pointer", fontSize: 11, fontFamily: "monospace", transition: "all .15s",
+        background: activeSeg === id ? `rgba(${id === "long" ? "0,229,160" : id === "short" ? "255,140,66" : "77,166,255"},0.12)` : "transparent",
+        border: `1px solid ${activeSeg === id ? segMap[id].color : "rgba(255,255,255,0.08)"}`,
+        color: activeSeg === id ? segMap[id].color : C.muted }}>
+      {segMap[id].label}
+    </button>
+  );
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
-        <StatCard label="Max Ust Uste TP" value={maxTP} color={C.green} sub="Ardisik TP serisi" />
-        <StatCard label="Max Ust Uste SL" value={maxSL} color={C.red}   sub="Ardisik SL serisi" />
+      {/* Segment selector */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+        <SegButton id="all" /><SegButton id="long" /><SegButton id="short" />
       </div>
-      <SecTitle>Seri Gecmisi</SecTitle>
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={chartData} barSize={4}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-          <XAxis dataKey="x" tick={{ fill: C.muted, fontSize: 9 }} />
-          <YAxis tick={{ fill: C.muted, fontSize: 9 }} />
-          <ReferenceLine y={0} stroke="rgba(255,255,255,0.18)" />
-          <Tooltip formatter={(v, n) => [Math.abs(v), n]} />
-          <Bar dataKey="tpStreak" name="TP Serisi" fill={C.green} />
-          <Bar dataKey="slStreak" name="SL Serisi" fill={C.red} />
-        </BarChart>
-      </ResponsiveContainer>
+
+      {/* Summary cards */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
+        <StatCard label="Islem Sayisi"     value={seg.trades.length}  color={C.textBright} />
+        <StatCard label="Max Ust Uste TP"  value={maxTP}              color={C.green} sub="Ardisik TP serisi" />
+        <StatCard label="Max Ust Uste SL"  value={maxSL}              color={C.red}   sub="Ardisik SL serisi" />
+      </div>
+
+      {/* Streak chart */}
+      <SecTitle>Seri Gecmisi — {seg.label}</SecTitle>
+      {chartData.length > 0 ? (
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={chartData} barSize={4}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+            <XAxis dataKey="x" tick={{ fill: C.muted, fontSize: 9 }} />
+            <YAxis tick={{ fill: C.muted, fontSize: 9 }} />
+            <ReferenceLine y={0} stroke="rgba(255,255,255,0.18)" />
+            <Tooltip formatter={(v, n) => [Math.abs(v), n]} />
+            <Bar dataKey="tpStreak" name="TP Serisi" fill={C.green} />
+            <Bar dataKey="slStreak" name="SL Serisi" fill={C.red} />
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ padding: 24, textAlign: "center", color: C.muted, fontSize: 12 }}>Bu segment için veri yok.</div>
+      )}
+
+      {/* Carpan hesabi */}
       <div style={{ marginTop: 24 }}>
-        <SecTitle>Carpan Etki Hesabi (Komisyon Dahil)</SecTitle>
+        <SecTitle>Carpan Etki Hesabi — {seg.label} (Komisyon Dahil)</SecTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(195px,1fr))", gap: 10 }}>
           {[
             { label: `${maxTP}x ust uste TP`, mult: Math.pow(TP_MULT, maxTP), color: C.green },
@@ -529,44 +604,82 @@ function ConflictTab({ data }) {
 }
 
 function MonthlyTab({ data }) {
-  const monthly = calcMonthly(validTrades(data.trades));
+  const valid  = validTrades(data.trades);
+  const longs  = valid.filter((t) => t.direction === "LONG");
+  const shorts = valid.filter((t) => t.direction === "SHORT");
+  const [activeSeg, setActiveSeg] = useState("all");
+
+  const segMap = {
+    all:   { trades: valid,  label: "Tum Islemler", color: C.blue   },
+    long:  { trades: longs,  label: "Sadece LONG",  color: C.green  },
+    short: { trades: shorts, label: "Sadece SHORT", color: C.orange },
+  };
+  const seg = segMap[activeSeg];
+  const monthly = calcMonthly(seg.trades);
+
+  const MonthTable = ({ data }) => (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr>{["Ay","Toplam","TP","SL","Win Rate"].map((h) => (
+            <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: C.muted, fontSize: 9, textTransform: "uppercase", letterSpacing: 1, borderBottom: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)" }}>{h}</th>
+          ))}</tr>
+        </thead>
+        <tbody>
+          {data.map((m, i) => (
+            <tr key={i} style={{ background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent" }}>
+              <td style={{ padding: "9px 14px", fontFamily: "monospace", color: C.textBright }}>{m.month}</td>
+              <td style={{ padding: "9px 14px", color: C.text }}>{m.total}</td>
+              <td style={{ padding: "9px 14px", color: C.green, fontWeight: 600 }}>{m.tp}</td>
+              <td style={{ padding: "9px 14px", color: C.red, fontWeight: 600 }}>{m.sl}</td>
+              <td style={{ padding: "9px 14px" }}>
+                <span style={{ color: wrColor(m.wr), fontWeight: 700, fontFamily: "monospace" }}>{m.wr}%</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <div>
-      <SecTitle>Aylik Performans</SecTitle>
-      <ResponsiveContainer width="100%" height={240}>
-        <BarChart data={monthly}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-          <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 9 }} />
-          <YAxis domain={[0, 100]} tick={{ fill: C.muted, fontSize: 10 }} tickFormatter={(v) => `${v}%`} width={40} />
-          <ReferenceLine y={50} stroke="rgba(255,255,255,0.18)" strokeDasharray="4 4" />
-          <Tooltip formatter={(v) => [`${v}%`, "Win Rate"]} />
-          <Bar dataKey="wr" name="Win Rate" radius={[3,3,0,0]}>
-            {monthly.map((m, i) => <Cell key={i} fill={wrColor(m.wr)} fillOpacity={0.85} />)}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-      <div style={{ marginTop: 20, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead>
-            <tr>{["Ay","Toplam","TP","SL","Win Rate"].map((h) => (
-              <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: C.muted, fontSize: 9, textTransform: "uppercase", letterSpacing: 1, borderBottom: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)" }}>{h}</th>
-            ))}</tr>
-          </thead>
-          <tbody>
-            {monthly.map((m, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent" }}>
-                <td style={{ padding: "9px 14px", fontFamily: "monospace", color: C.textBright }}>{m.month}</td>
-                <td style={{ padding: "9px 14px", color: C.text }}>{m.total}</td>
-                <td style={{ padding: "9px 14px", color: C.green, fontWeight: 600 }}>{m.tp}</td>
-                <td style={{ padding: "9px 14px", color: C.red,   fontWeight: 600 }}>{m.sl}</td>
-                <td style={{ padding: "9px 14px" }}>
-                  <span style={{ color: wrColor(m.wr), fontWeight: 700, fontFamily: "monospace" }}>{m.wr}%</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Segment selector */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+        {Object.entries(segMap).map(([id, s]) => (
+          <button key={id} onClick={() => setActiveSeg(id)}
+            style={{ padding: "5px 16px", borderRadius: 3, cursor: "pointer", fontSize: 11, fontFamily: "monospace", transition: "all .15s",
+              background: activeSeg === id ? `rgba(${id === "long" ? "0,229,160" : id === "short" ? "255,140,66" : "77,166,255"},0.12)` : "transparent",
+              border: `1px solid ${activeSeg === id ? s.color : "rgba(255,255,255,0.08)"}`,
+              color: activeSeg === id ? s.color : C.muted }}>
+            {s.label}
+          </button>
+        ))}
       </div>
+
+      <SecTitle>Aylik Performans — {seg.label}</SecTitle>
+
+      {monthly.length === 0 ? (
+        <div style={{ padding: 24, textAlign: "center", color: C.muted, fontSize: 12 }}>Bu segment için veri yok.</div>
+      ) : (
+        <>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={monthly}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+              <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 9 }} />
+              <YAxis domain={[0, 100]} tick={{ fill: C.muted, fontSize: 10 }} tickFormatter={(v) => `${v}%`} width={40} />
+              <ReferenceLine y={50} stroke="rgba(255,255,255,0.18)" strokeDasharray="4 4" />
+              <Tooltip formatter={(v) => [`${v}%`, "Win Rate"]} />
+              <Bar dataKey="wr" name="Win Rate" radius={[3,3,0,0]}>
+                {monthly.map((m, i) => <Cell key={i} fill={wrColor(m.wr)} fillOpacity={0.85} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div style={{ marginTop: 20 }}>
+            <MonthTable data={monthly} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
