@@ -8,8 +8,8 @@ import { dbLoadAll, dbSaveDataset, dbDeleteDataset } from "./supabase.js";
 // ─────────────────────────────────────────────────────────────────────────────
 //  CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-const TP_MULT = 1.0485;
-const SL_MULT = 0.9475;
+const TP_MULT = 1.04825;
+const SL_MULT = 0.94725;
 
 const TF_ORDER = ["1m","3m","5m","15m","30m","1h","2h","4h","6h","8h","12h","1d","3d","1w","1M","main"];
 const tfSort   = (a, b) => {
@@ -28,13 +28,13 @@ const SL_BUCKETS = [
 ];
 
 const TABS = [
-  { id: "overview",     label: "Genel Bakis"  },
-  { id: "winrate",      label: "Win Rate"     },
-  { id: "distribution", label: "SL% Dagilim" },
-  { id: "equity",       label: "Equity Curve" },
-  { id: "streaks",      label: "Seriler"      },
-  { id: "conflict",     label: "Conflict"     },
-  { id: "monthly",      label: "Aylik"        },
+  { id: "overview",     label: "Genel Bakis"       },
+  { id: "winrate",      label: "Win Rate"           },
+  { id: "monthly",      label: "Aylik Sonuclar"     },
+  { id: "equity",       label: "Equity Curve"       },
+  { id: "distribution", label: "Islem % Dagilimi"   },
+  { id: "streaks",      label: "Seriler"            },
+  { id: "conflict",     label: "Conflict Type"      },
 ];
 
 const C = {
