@@ -194,7 +194,10 @@ function calcMonthly(trades) {
     if (t.result === "TP") map[t.month].tp++; else if (t.result === "SL") map[t.month].sl++;
   });
   return Object.values(map).sort((a, b) => a.month.localeCompare(b.month)).map((m) => ({
-    ...m, total: m.tp + m.sl, wr: m.tp + m.sl ? +((m.tp / (m.tp + m.sl)) * 100).toFixed(1) : 0,
+    ...m,
+    total:  m.tp + m.sl,
+    wr:     m.tp + m.sl ? +((m.tp / (m.tp + m.sl)) * 100).toFixed(1) : 0,
+    totalR: +(m.tp - m.sl).toFixed(1),
   }));
 }
 
@@ -326,41 +329,78 @@ function WinRateTab({ data }) {
 }
 
 function DistributionTab({ data }) {
-  const dist = slDistribution(validTrades(data.trades));
+  const valid  = validTrades(data.trades);
+  const longs  = valid.filter((t) => t.direction === "LONG");
+  const shorts = valid.filter((t) => t.direction === "SHORT");
+  const [activeSeg, setActiveSeg] = useState("all");
+
+  const segMap = {
+    all:   { trades: valid,  label: "Tum Islemler", color: C.blue   },
+    long:  { trades: longs,  label: "Sadece LONG",  color: C.green  },
+    short: { trades: shorts, label: "Sadece SHORT", color: C.orange },
+  };
+  const seg  = segMap[activeSeg];
+  const dist = slDistribution(seg.trades);
+
+  const DistTable = ({ dist }) => (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr>{["SL% Araligi","Toplam","TP","SL","Win Rate"].map((h) => (
+            <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: C.muted, fontSize: 9, textTransform: "uppercase", letterSpacing: 1, borderBottom: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)" }}>{h}</th>
+          ))}</tr>
+        </thead>
+        <tbody>
+          {dist.map((d, i) => (
+            <tr key={i} style={{ background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent" }}>
+              <td style={{ padding: "9px 14px", fontFamily: "monospace", color: C.textBright }}>{d.label}%</td>
+              <td style={{ padding: "9px 14px", color: C.text }}>{d.total}</td>
+              <td style={{ padding: "9px 14px", color: C.green, fontWeight: 600 }}>{d.tp}</td>
+              <td style={{ padding: "9px 14px", color: C.red, fontWeight: 600 }}>{d.sl}</td>
+              <td style={{ padding: "9px 14px", color: wrColor(d.wr), fontWeight: 700, fontFamily: "monospace" }}>{d.total ? `${d.wr}%` : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <div>
-      <SecTitle>Entry SL% Dagilimi</SecTitle>
-      <ResponsiveContainer width="100%" height={240}>
-        <BarChart data={dist}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-          <XAxis dataKey="label" tick={{ fill: C.muted, fontSize: 11 }} />
-          <YAxis tick={{ fill: C.muted, fontSize: 10 }} />
-          <Tooltip formatter={(v, n) => [v, n]} />
-          <Bar dataKey="tp" name="TP" stackId="a" fill={C.green} />
-          <Bar dataKey="sl" name="SL" stackId="a" fill={C.red} radius={[3,3,0,0]} />
-          <Legend formatter={(v) => <span style={{ color: v === "tp" ? C.green : C.red, fontSize: 11 }}>{v.toUpperCase()}</span>} />
-        </BarChart>
-      </ResponsiveContainer>
-      <div style={{ marginTop: 20, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead>
-            <tr>{["SL% Araligi","Toplam","TP","SL","Win Rate"].map((h) => (
-              <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: C.muted, fontSize: 9, textTransform: "uppercase", letterSpacing: 1, borderBottom: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)" }}>{h}</th>
-            ))}</tr>
-          </thead>
-          <tbody>
-            {dist.map((d, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent" }}>
-                <td style={{ padding: "9px 14px", fontFamily: "monospace", color: C.textBright }}>{d.label}%</td>
-                <td style={{ padding: "9px 14px", color: C.text }}>{d.total}</td>
-                <td style={{ padding: "9px 14px", color: C.green, fontWeight: 600 }}>{d.tp}</td>
-                <td style={{ padding: "9px 14px", color: C.red, fontWeight: 600 }}>{d.sl}</td>
-                <td style={{ padding: "9px 14px", color: wrColor(d.wr), fontWeight: 700, fontFamily: "monospace" }}>{d.total ? `${d.wr}%` : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Segment selector */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+        {Object.entries(segMap).map(([id, s]) => (
+          <button key={id} onClick={() => setActiveSeg(id)}
+            style={{ padding: "5px 16px", borderRadius: 3, cursor: "pointer", fontSize: 11, fontFamily: "monospace", transition: "all .15s",
+              background: activeSeg === id ? `rgba(${id === "long" ? "0,229,160" : id === "short" ? "255,140,66" : "77,166,255"},0.12)` : "transparent",
+              border: `1px solid ${activeSeg === id ? s.color : "rgba(255,255,255,0.08)"}`,
+              color: activeSeg === id ? s.color : C.muted }}>
+            {s.label}
+          </button>
+        ))}
       </div>
+
+      <SecTitle>Entry SL% Dagilimi — {seg.label}</SecTitle>
+      {dist.every((d) => d.total === 0) ? (
+        <div style={{ padding: 24, textAlign: "center", color: C.muted, fontSize: 12 }}>Bu segment icin veri yok.</div>
+      ) : (
+        <>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={dist}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+              <XAxis dataKey="label" tick={{ fill: C.muted, fontSize: 11 }} />
+              <YAxis tick={{ fill: C.muted, fontSize: 10 }} />
+              <Tooltip formatter={(v, n) => [v, n]} />
+              <Bar dataKey="tp" name="TP" stackId="a" fill={C.green} />
+              <Bar dataKey="sl" name="SL" stackId="a" fill={C.red} radius={[3,3,0,0]} />
+              <Legend formatter={(v) => <span style={{ color: v === "tp" ? C.green : C.red, fontSize: 11 }}>{v.toUpperCase()}</span>} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div style={{ marginTop: 20 }}>
+            <DistTable dist={dist} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -621,7 +661,7 @@ function MonthlyTab({ data }) {
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <thead>
-          <tr>{["Ay","Toplam","TP","SL","Win Rate"].map((h) => (
+          <tr>{["Ay","Toplam","TP","SL","Total R","Win Rate"].map((h) => (
             <th key={h} style={{ padding: "8px 14px", textAlign: "left", color: C.muted, fontSize: 9, textTransform: "uppercase", letterSpacing: 1, borderBottom: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)" }}>{h}</th>
           ))}</tr>
         </thead>
@@ -632,6 +672,11 @@ function MonthlyTab({ data }) {
               <td style={{ padding: "9px 14px", color: C.text }}>{m.total}</td>
               <td style={{ padding: "9px 14px", color: C.green, fontWeight: 600 }}>{m.tp}</td>
               <td style={{ padding: "9px 14px", color: C.red, fontWeight: 600 }}>{m.sl}</td>
+              <td style={{ padding: "9px 14px" }}>
+                <span style={{ color: m.totalR >= 0 ? C.green : C.red, fontWeight: 700, fontFamily: "monospace" }}>
+                  {m.totalR >= 0 ? "+" : ""}{m.totalR}R
+                </span>
+              </td>
               <td style={{ padding: "9px 14px" }}>
                 <span style={{ color: wrColor(m.wr), fontWeight: 700, fontFamily: "monospace" }}>{m.wr}%</span>
               </td>
